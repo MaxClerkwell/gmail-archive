@@ -1,0 +1,31 @@
+services:
+  sync:
+    build: .
+    command: gmail-archive-sync
+    env_file: .env
+    environment:
+      GMAIL_SYNC_INTERVAL: "43200"   # twice a day
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+  api:
+    build: .
+    command: gmail-archive-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+  mcp:
+    build: .
+    command: gmail-archive-mcp
+    ports:
+      - "8001:8001"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  data:
