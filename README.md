@@ -30,7 +30,8 @@ All three share one SQLite file with FTS5 full-text search.
 
 The first run downloads the whole mailbox; afterwards only new messages are
 fetched. The sync interval is set in `compose.yaml` (`GMAIL_SYNC_INTERVAL`,
-seconds; default 43200 = twice a day).
+seconds; default 43200 = twice a day). Messages are fetched in batches of
+`GMAIL_FETCH_BATCH` (default 50) per IMAP round trip.
 
 ## Running without Docker
 
