@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS mails (
     subject     TEXT,
     body_text   TEXT,
     labels      TEXT,
-    raw         BLOB
+    raw         BLOB,
+    trashed_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_mails_date ON mails(date);
 CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);
@@ -33,6 +34,9 @@ def connect(path: str = DB_PATH) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(mails)")}
+    if "trashed_at" not in cols:
+        conn.execute("ALTER TABLE mails ADD COLUMN trashed_at TEXT")
     return conn
 
 
@@ -66,6 +70,28 @@ def search_mails(conn, query: str, limit=20, with_body=False):
         (query, limit),
     )
     return [row_to_dict(r, with_body) for r in rows]
+
+
+def resolve_ids(conn, ids: list) -> tuple[list[int], list]:
+    """Accept numeric UIDs or RFC Message-ID strings; return (found UIDs, unknown ids)."""
+    uids, unknown = [], []
+    for i in ids:
+        if isinstance(i, int) or (isinstance(i, str) and i.isdigit()):
+            row = conn.execute("SELECT uid FROM mails WHERE uid = ?", (int(i),)).fetchone()
+        else:
+            row = conn.execute("SELECT uid FROM mails WHERE message_id = ?", (i,)).fetchone()
+        if row:
+            uids.append(row["uid"])
+        else:
+            unknown.append(i)
+    return uids, unknown
+
+
+def mark_trashed(conn, uids: list[int]):
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    conn.executemany("UPDATE mails SET trashed_at = ? WHERE uid = ?", [(now, u) for u in uids])
+    conn.commit()
 
 
 def stats(conn):

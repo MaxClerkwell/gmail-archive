@@ -2,8 +2,9 @@ import os
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
+from pydantic import BaseModel
 
-from . import db
+from . import db, gmail
 
 app = FastAPI(title="gmail-archive", version="0.1.0")
 
@@ -28,6 +29,25 @@ def mail(uid: int):
 def search(q: str, limit: int = Query(20, le=200), body: bool = False):
     with db.connect() as conn:
         return db.search_mails(conn, q, limit, body)
+
+
+class TrashRequest(BaseModel):
+    ids: list[int | str]
+
+
+@app.post("/mails/trash")
+def trash_mails(req: TrashRequest):
+    """Move mails to Gmail's trash (purged after 30 days). Accepts UIDs or Message-IDs."""
+    with db.connect() as conn:
+        uids, unknown = db.resolve_ids(conn, req.ids)
+        if not uids:
+            raise HTTPException(404, "no matching mails")
+        try:
+            moved = gmail.trash(uids)
+        except Exception as e:
+            raise HTTPException(502, f"imap error: {e}")
+        db.mark_trashed(conn, moved)
+    return {"trashed": moved, "not_found": unknown}
 
 
 @app.get("/stats")

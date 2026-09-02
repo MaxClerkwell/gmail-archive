@@ -51,7 +51,13 @@ GET /mails?limit=50&offset=0&since=2026-01-01&body=false
 GET /mails/{uid}
 GET /search?q=invoice+AND+2026&limit=20
 GET /stats
+POST /mails/trash        {"ids": [123, "<message-id@example.com>"]}
 ```
+
+`POST /mails/trash` moves the given mails (by UID or Message-ID) into Gmail's
+trash, where Google purges them automatically after 30 days. The local copy is
+kept and marked with `trashed_at`. This is the only write operation; the MCP
+server stays read-only.
 
 Interactive docs at `/docs`.
 

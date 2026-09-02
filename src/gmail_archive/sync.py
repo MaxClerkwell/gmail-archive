@@ -1,14 +1,12 @@
 import email
-import imaplib
 import os
 import time
 from datetime import datetime, timezone
 from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime
 
-from . import db
+from . import db, gmail
 
-MAILBOX = os.environ.get("GMAIL_MAILBOX", "[Gmail]/All Mail")
 STORE_RAW = os.environ.get("GMAIL_STORE_RAW", "0") == "1"
 INTERVAL = int(os.environ.get("GMAIL_SYNC_INTERVAL", "0"))  # seconds, 0 = run once
 
@@ -34,16 +32,11 @@ def _body_text(msg):
 
 
 def sync_once():
-    user = os.environ["GMAIL_USER"]
-    password = os.environ["GMAIL_APP_PASSWORD"]
-
     conn = db.connect()
     row = conn.execute("SELECT value FROM state WHERE key='last_uid'").fetchone()
     last_uid = int(row[0]) if row else 0
 
-    imap = imaplib.IMAP4_SSL("imap.gmail.com")
-    imap.login(user, password)
-    imap.select(f'"{MAILBOX}"', readonly=True)
+    imap = gmail.connect(readonly=True)
 
     _, data = imap.uid("SEARCH", None, f"UID {last_uid + 1}:*")
     uids = [u for u in data[0].split() if int(u) > last_uid]
